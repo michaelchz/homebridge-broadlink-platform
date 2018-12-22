@@ -155,13 +155,36 @@ BroadlinkAccessory.prototype = {
     getA1State: function(callback) {
         var self = this;
         var s_index = self.sname;
-        if (s_index == 's1') {
-            callback(null, 99);
-        } else if (s_index == 's2') {
-            callback(null, 88);
-        } else {
-        	callback(null, 0);
-        }
+        var b = new broadlink();
+        self.discover(b);
+
+        b.on("deviceReady", (dev) => {
+            if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
+                dev.check_sensors();
+                dev.on("temperature", (info) => {
+                	if (s_index == 's1') {
+                        self.log(self.name + " temperature - " + info);
+                        dev.exit();
+                        clearInterval(checkAgainA1)
+                        return callback(null, info);
+                	}
+                });
+                dev.on("humidity", (info) => {
+                	if (s_index == 's2') {
+                        self.log(self.name + " humidity - " + info);
+                        dev.exit();
+                        clearInterval(checkAgainA1)
+                        return callback(null, info);
+                	}
+                });
+
+            } else {
+                dev.exit();
+            }
+        });
+        var checkAgainA1 = setInterval(function() {
+            self.discover(b);
+        }, 1000)
 
     },
 
