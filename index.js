@@ -31,6 +31,16 @@ broadlinkPlatform.prototype = {
                     myAccessories.push(accessory);
                     this.log('Created ' + accessory.name + ' ' + accessory.sname + ' Accessory');
                 }
+            } else if (foundAccessories[i].type == "A1") {
+                foundAccessories[i].sname = "s1";
+                var accessory = new BroadlinkAccessory(this.log, foundAccessories[i]);
+                myAccessories.push(accessory);
+                this.log('Created ' + accessory.name + ' ' + accessory.sname + ' Accessory');
+
+                foundAccessories[i].sname = "s2";
+                var accessory = new BroadlinkAccessory(this.log, foundAccessories[i]);
+                myAccessories.push(accessory);
+                this.log('Created ' + accessory.name + ' ' + accessory.sname + ' Accessory');
             } else {
                 var accessory = new BroadlinkAccessory(this.log, foundAccessories[i]);
                 myAccessories.push(accessory);
@@ -107,6 +117,31 @@ BroadlinkAccessory.prototype = {
 
             services.push(switchService, informationService);
 
+        } else if (type == 'A1') {
+        	if (this.sname == 's1') {
+                var tempService = new Service.TemperatureSensor(this.name + ' Temperature');;
+                tempService
+                    .getCharacteristic(Characteristic.CurrentTemperature)
+                    .on('get', this.getA1State.bind(this));
+
+                informationService
+                    .setCharacteristic(Characteristic.Model, 'A1')
+                    .setCharacteristic(Characteristic.SerialNumber, this.sname);
+
+                services.push(tempService, informationService);
+        	} else if (this.sname == 's2') {
+                var humiService = new Service.HumiditySensor(this.name + ' Humidity');;
+                humiService
+                    .getCharacteristic(Characteristic.CurrentRelativeHumidity)
+                    .on('get', this.getA1State.bind(this));
+
+                informationService
+                    .setCharacteristic(Characteristic.Model, 'A1')
+                    .setCharacteristic(Characteristic.SerialNumber, this.sname);
+
+                services.push(humiService, informationService);        		
+        	}
+
         }
 
         return services;
@@ -115,6 +150,19 @@ BroadlinkAccessory.prototype = {
     // b: broadlink
     discover: function(b) {
         b.discover(this.local_ip_address);
+    },
+
+    getA1State: function(callback) {
+        var self = this;
+        var s_index = self.sname;
+        if (s_index == 's1') {
+            callback(null, 99);
+        } else if (s_index == 's2') {
+            callback(null, 88);
+        } else {
+        	callback(null, 0);
+        }
+
     },
 
     getSPState: function(callback) {
