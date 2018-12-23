@@ -200,12 +200,16 @@ BroadlinkAccessory.prototype = {
                     self.log(self.name + self.sname + " power is on - " + pwr);
                     dev.exit();
                     clearInterval(checkAgainSP)
-                    if (!pwr) {
-                        self.powered = false;
-                        return callback(null, false);
-                    } else {
-                        self.powered = true;
-                        return callback(null, true);
+                    try {
+                        if (!pwr) {
+                            self.powered = false;
+                            return callback(null, false);
+                        } else {
+                            self.powered = true;
+                            return callback(null, true);
+                        }
+                    } catch (e) {
+                    	// avoid multiple callback
                     }
                 });
             } else {
