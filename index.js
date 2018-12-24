@@ -222,7 +222,6 @@ BroadlinkAccessory.prototype = {
     getSPState: function(callback) {
         var self = this;
         var b = new broadlink();
-        self.discover(b);
 
         b.on("deviceReady", (dev) => {
             if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
@@ -247,9 +246,17 @@ BroadlinkAccessory.prototype = {
                 dev.exit();
             }
         });
+
+        self.discover(b);
+        var discoverRepeat = 6;
         var checkAgainSP = setInterval(function() {
-            self.discover(b);
-        }, 1000)
+            if (discoverRepeat == 0) {
+                clearInterval(checkAgainSP);
+            } else {
+                discoverRepeat--;
+                self.discover(b);
+            }
+        }, 1000);
 
     },
 
