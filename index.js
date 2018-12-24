@@ -160,33 +160,7 @@ BroadlinkAccessory.prototype = {
         var ts = new Date().getTime();
 
         if (ts > self.shared.deadline && self.shared.b == null) {
-            self.shared.b = new broadlink();
-            self.shared.b.on("deviceReady", (dev) => {
-                if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
-                    dev.check_sensors();
-                    dev.on("all_info", (info) => {
-                	    self.shared.data = info;
-                         dev.exit();
-                         self.shared.deadline = new Date().getTime() + 10000;
-                    });
-
-                } else {
-                    dev.exit();
-                }
-            });
-
-            self.discover(self.shared.b);
-            var discoverRepeat = 6;
-            var discoverTimer = setInterval(function() {
-                var ts = new Date().getTime();
-                if (ts < self.shared.deadline || discoverRepeat == 0) {
-                    clearInterval(discoverTimer);
-                    self.shared.b = null;
-                } else {
-                    checkRepeat--;
-                    self.discover(self.shared.b);
-                }
-            }, 1000);
+            self.startA1Communication();
         }
 
         var s_index = self.sname;
@@ -210,6 +184,38 @@ BroadlinkAccessory.prototype = {
             return;
         }
 
+    },
+
+    startA1Communication: function() {
+        var self = this;
+
+        self.shared.b = new broadlink();
+        self.shared.b.on("deviceReady", (dev) => {
+            if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
+                dev.check_sensors();
+                dev.on("all_info", (info) => {
+                	self.shared.data = info;
+                    dev.exit();
+                    self.shared.deadline = new Date().getTime() + 10000;
+                });
+
+            } else {
+                dev.exit();
+            }
+        });
+
+        self.discover(self.shared.b);
+        var discoverRepeat = 6;
+        var discoverTimer = setInterval(function() {
+            var ts = new Date().getTime();
+            if (ts < self.shared.deadline || discoverRepeat == 0) {
+                clearInterval(discoverTimer);
+                self.shared.b = null;
+            } else {
+            	discoverRepeat--;
+                self.discover(self.shared.b);
+            }
+        }, 1000);
 
     },
 
