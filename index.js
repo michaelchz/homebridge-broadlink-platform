@@ -25,6 +25,8 @@ broadlinkPlatform.prototype = {
 
         for (var i = 0; i < foundAccessories.length; i++) {
             if (foundAccessories[i].type == "MP") {
+                foundAccessories[i].shared = {b: null, data: null, deadline: 0};
+
                 for (var a = 1; a <= 4; a++) {
                     foundAccessories[i].sname = "s" + a;
                     var accessory = new BroadlinkAccessory(this.log, foundAccessories[i]);
@@ -160,7 +162,9 @@ BroadlinkAccessory.prototype = {
         var ts = new Date().getTime();
 
         if (ts > self.shared.deadline && self.shared.b == null) {
-            self.startA1Communication();
+            self.retrieveDataFromDevice("all_info", (dev) => {
+                dev.check_sensors();
+            });
         }
 
         var s_index = self.sname;
@@ -183,39 +187,6 @@ BroadlinkAccessory.prototype = {
             }, 1000);
             return;
         }
-
-    },
-
-    startA1Communication: function() {
-        var self = this;
-
-        self.shared.b = new broadlink();
-        self.shared.b.on("deviceReady", (dev) => {
-            if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
-                dev.check_sensors();
-                dev.on("all_info", (info) => {
-                	self.shared.data = info;
-                    dev.exit();
-                    self.shared.deadline = new Date().getTime() + 10000;
-                });
-
-            } else {
-                dev.exit();
-            }
-        });
-
-        self.discover(self.shared.b);
-        var discoverRepeat = 6;
-        var discoverTimer = setInterval(function() {
-            var ts = new Date().getTime();
-            if (ts < self.shared.deadline || discoverRepeat == 0) {
-                clearInterval(discoverTimer);
-                self.shared.b = null;
-            } else {
-            	discoverRepeat--;
-                self.discover(self.shared.b);
-            }
-        }, 1000);
 
     },
 
@@ -311,40 +282,37 @@ BroadlinkAccessory.prototype = {
 
     getMPstate: function(callback) {
         var self = this;
-        var b = new broadlink();
+        var ts = new Date().getTime();
+
+        if (ts > self.shared.deadline && self.shared.b == null) {
+            self.retrieveDataFromDevice("mp_power", (dev) => {
+                dev.check_power();
+            });
+        }
+
         var s_index = self.sname[1];
         self.log("checking status for " + self.name);
-        self.discover(b);
-        b.on("deviceReady", (dev) => {
-            //self.log("detected device type:" + dev.type + " @ " + dev.host.address);
-            if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
-                //self.log("deviceReady for " + self.name);
-                dev.check_power();
-                dev.on("mp_power", (status_array) => {
-                    //self.log("Status is ready for " + self.name);
-                    self.log(self.name + " power is on - " + status_array[s_index - 1]);
-                    dev.exit();
-                    //self.log("MP1 Exited for " + self.sname);
-                    clearInterval(checkAgain);
-                    if (!status_array[s_index - 1]) {
-                        self.powered = false;
-                        return callback(null, false);
-                    } else {
-                        self.powered = true;
-                        return callback(null, true);
-                    }
-                });
-
-            } else {
-                dev.exit();
-                //self.log("exited device type:" + dev.type + " @ " + dev.host.address);
-            }
-        });
-        var checkAgain = setInterval(function() {
-            //self.log("Discovering Again for Status... " + self.sname);
-            self.discover(b);
-        }, 1000)
-
+        if (ts <= self.shared.deadline) {
+            self.powered = self.shared.data[s_index - 1];
+            self.log(self.name + " power is on - " + self.powered);
+            return callback(null, self.powered);
+        } else if (self.shared.b != null) {
+            var checkRepeat = 6;
+            var checkTimer = setInterval(function() {
+                var ts = new Date().getTime();
+                if (checkRepeat == 0) {
+                    clearInterval(checkTimer);
+                } else if (ts < self.shared.deadline) {
+                    clearInterval(checkTimer);
+                    self.powered = self.shared.data[s_index - 1];
+                    self.log(self.name + " power is on - " + self.powered);
+                    return callback(null, self.powered);
+                } else {
+                    checkRepeat--;
+                }
+            }, 1000);
+            return;
+        }
 
     },
 
@@ -399,5 +367,40 @@ BroadlinkAccessory.prototype = {
                 return callback(null, false)
             }
         }
+    },
+
+    retrieveDataFromDevice: function(event_name, trigger_func) {
+        var self = this;
+
+        self.shared.b = new broadlink();
+        self.shared.b.on("deviceReady", (dev) => {
+            if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
+                trigger_func(dev);
+                dev.on(event_name, (data) => {
+                    self.log(self.type + "(" + event_name + ") data retrieved");
+                    self.shared.data = data;
+                    dev.exit();
+                    self.shared.deadline = new Date().getTime() + 10000;
+                });
+
+            } else {
+                dev.exit();
+            }
+        });
+
+        self.discover(self.shared.b);
+        var discoverRepeat = 6;
+        var discoverTimer = setInterval(function() {
+            var ts = new Date().getTime();
+            if (ts < self.shared.deadline || discoverRepeat == 0) {
+                clearInterval(discoverTimer);
+                self.shared.b = null;
+            } else {
+                discoverRepeat--;
+                self.discover(self.shared.b);
+            }
+        }, 1000);
+
     }
+
 }
