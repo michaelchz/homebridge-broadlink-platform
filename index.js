@@ -168,8 +168,10 @@ BroadlinkAccessory.prototype = {
         }
 
         var s_index = self.sname;
+        self.log("checking status for " + self.name);
         if (ts <= self.shared.deadline) {
             var info = (s_index == 's1') ? self.shared.data.temperature : self.shared.data.humidity;
+            self.log(self.name + " value -* " + info);
             return callback(null, info);
         } else if (self.shared.b != null) {
             var checkRepeat = 6;
@@ -180,12 +182,12 @@ BroadlinkAccessory.prototype = {
                 } else if (ts < self.shared.deadline) {
                     clearInterval(checkTimer);
                     var info = (s_index == 's1') ? self.shared.data.temperature : self.shared.data.humidity;
+                    self.log(self.name + " value - " + info);
                     return callback(null, info);
                 } else {
                     checkRepeat--;
                 }
             }, 1000);
-            return;
         }
 
     },
@@ -294,7 +296,7 @@ BroadlinkAccessory.prototype = {
         self.log("checking status for " + self.name);
         if (ts <= self.shared.deadline) {
             self.powered = self.shared.data[s_index - 1];
-            self.log(self.name + " power is on - " + self.powered);
+            self.log(self.name + " power is on -* " + self.powered);
             return callback(null, self.powered);
         } else if (self.shared.b != null) {
             var checkRepeat = 6;
@@ -311,7 +313,6 @@ BroadlinkAccessory.prototype = {
                     checkRepeat--;
                 }
             }, 1000);
-            return;
         }
 
     },
