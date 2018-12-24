@@ -32,6 +32,8 @@ broadlinkPlatform.prototype = {
                     this.log('Created ' + accessory.name + ' ' + accessory.sname + ' Accessory');
                 }
             } else if (foundAccessories[i].type == "A1") {
+                foundAccessories[i].shared = {b: null, data: null, deadline: 0};
+
                 foundAccessories[i].sname = "s1";
                 var accessory = new BroadlinkAccessory(this.log, foundAccessories[i]);
                 myAccessories.push(accessory);
@@ -61,6 +63,7 @@ function BroadlinkAccessory(log, config) {
     this.mac = config.mac;
     this.powered = false;
     this.local_ip_address = config.local_ip_address;
+    this.shared = config.shared;
 
     if (!this.ip && !this.mac) throw new Error("You must provide a config value for 'ip' or 'mac'.");
 
@@ -154,37 +157,59 @@ BroadlinkAccessory.prototype = {
 
     getA1State: function(callback) {
         var self = this;
+        var ts = new Date().getTime();
+
+        if (ts > self.shared.deadline && self.shared.b == null) {
+            self.shared.b = new broadlink();
+            self.shared.b.on("deviceReady", (dev) => {
+                if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
+                    dev.check_sensors();
+                    dev.on("all_info", (info) => {
+                	    self.shared.data = info;
+                         dev.exit();
+                         self.shared.deadline = new Date().getTime() + 10000;
+                    });
+
+                } else {
+                    dev.exit();
+                }
+            });
+
+            self.discover(self.shared.b);
+            var discoverRepeat = 6;
+            var discoverTimer = setInterval(function() {
+                var ts = new Date().getTime();
+                if (ts < self.shared.deadline || discoverRepeat == 0) {
+                    clearInterval(discoverTimer);
+                    self.shared.b = null;
+                } else {
+                    checkRepeat--;
+                    self.discover(self.shared.b);
+                }
+            }, 1000);
+        }
+
         var s_index = self.sname;
-        var b = new broadlink();
-        self.discover(b);
+        if (ts <= self.shared.deadline) {
+            var info = (s_index == 's1') ? self.shared.data.temperature : self.shared.data.humidity;
+            return callback(null, info);
+        } else if (self.shared.b != null) {
+            var checkRepeat = 6;
+            var checkTimer = setInterval(function() {
+                var ts = new Date().getTime();
+                if (checkRepeat == 0) {
+                    clearInterval(checkTimer);
+                } else if (ts < self.shared.deadline) {
+                    clearInterval(checkTimer);
+                    var info = (s_index == 's1') ? self.shared.data.temperature : self.shared.data.humidity;
+                    return callback(null, info);
+                } else {
+                    checkRepeat--;
+                }
+            }, 1000);
+            return;
+        }
 
-        b.on("deviceReady", (dev) => {
-            if (self.mac_buff(self.mac).equals(dev.mac) || dev.host.address == self.ip) {
-                dev.check_sensors();
-                dev.on("temperature", (info) => {
-                	if (s_index == 's1') {
-                        self.log(self.name + " temperature - " + info);
-                        dev.exit();
-                        clearInterval(checkAgainA1)
-                        return callback(null, info);
-                	}
-                });
-                dev.on("humidity", (info) => {
-                	if (s_index == 's2') {
-                        self.log(self.name + " humidity - " + info);
-                        dev.exit();
-                        clearInterval(checkAgainA1)
-                        return callback(null, info);
-                	}
-                });
-
-            } else {
-                dev.exit();
-            }
-        });
-        var checkAgainA1 = setInterval(function() {
-            self.discover(b);
-        }, 1000)
 
     },
 
